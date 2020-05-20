@@ -6,9 +6,7 @@ import numpy as np
 import pandas as pd
 import logging
 import problem
-#reload(problem)
 import evaluate
-#reload(evaluate)
 from problem import Problem
 from evaluate import SolutionEvaluator
 
@@ -113,6 +111,8 @@ class PSOSelector(object):
            self.iteration_ = 0
            self.pop_ = None
            self.count_global = 0
+           self._final_cols = None
+           self._final_index = None
            self._setup_initialization(initialization, fitness_method)
            self._setup_solution_comparator(maximize_objective)
            self.selected_features_ = None
@@ -126,7 +126,9 @@ class PSOSelector(object):
            
            init_search = {
                     'type_1': self.search_type_1,
-                    'type_2': self.search_type_2
+                    'type_2': self.search_type_2,
+                    'type_3': self.search_type_3,
+                    'type_4': self.search_type_4
                           }     
                                                      
            self._initialization = initialization
@@ -198,13 +200,17 @@ class PSOSelector(object):
                for i in range(0, self.num_particles):
                    self.count.append(self.count_features(
                            self.best_individual_[i, :]))
-                       
-               best_glob = self.best_global_[0]
-               self.selected_features_ = np.ma.masked_where(best_glob[:-1]>0.6, best_glob[:-1])
-               self.selected_features_, = np.where(self.selected_features_.mask == True)
-               rootLogger.info((f'Index features selected: {self.selected_features_} /n, '
-                                f'Columns selected: {colunas} \n'))
-                        
+               
+           best_glob = self.best_global_[0]
+           self.selected_features_ = np.ma.masked_where(best_glob[:-1]>0.6, best_glob[:-1])
+           self.selected_features_, = np.where(self.selected_features_.mask == True)
+           colunas = list(prob.data.iloc[:, self.selected_features_].columns)
+           rootLogger.info((f'Final Index features selected: {self.selected_features_} /n, '
+                            f'Final Columns selected: {colunas} \n'))
+           
+           self._final_cols = colunas     
+           self._final_index = self.selected_features_
+           
        def _initialize(self, X):
            
           self.iteration_ = 0
@@ -219,21 +225,38 @@ class PSOSelector(object):
        def search_type_1(self):
            
           self.pop_ = self.evaluator_.evaluate(self.pop_)
-          self.calculate_best_individual_pso_1_1(self.pop_)
-          self.calculate_best_global_pso_1_1()
+          self.calculate_best_individual_type_1(self.pop_)
+          self.calculate_best_global_type_1()
           self.solution_[self.iteration_, :] = self.best_global_
           self.update_velocity()
           self.iteration_ += 1
-          
-          
+             
        def search_type_2(self):
          
           self.pop_ = self.evaluator_.evaluate(self.pop_)
-          self.calculate_best_individual(self.pop_)
-          self.calculate_best_global()
+          self.calculate_best_individual_type_2(self.pop_)
+          self.calculate_best_global_type_2()
           self.solution_[self.iteration_, :] = self.best_global_
           self.update_velocity()
           self.iteration_ += 1
+
+       def search_type_3(self):
+         
+          self.pop_ = self.evaluator_.evaluate(self.pop_)
+          self.calculate_best_individual_type_3(self.pop_)
+          self.calculate_best_global_type_3()
+          self.solution_[self.iteration_, :] = self.best_global_
+          self.update_velocity()
+          self.iteration_ += 1
+
+       def search_type_4(self):
+         
+          self.pop_ = self.evaluator_.evaluate(self.pop_)
+          self.calculate_best_individual_type_4(self.pop_)
+          self.calculate_best_global_type_4()
+          self.solution_[self.iteration_, :] = self.best_global_
+          self.update_velocity()
+          self.iteration_ += 1        
          
        def update_velocity(self):
          
@@ -252,15 +275,15 @@ class PSOSelector(object):
                  self.velocity_[i,j] = velocity
                  self.pop_[i,j] += velocity
                  
-       def calculate_best_individual(self, pop):
+       def calculate_best_individual_type_2(self, pop):
          
          if self.initialize == 0:
-             for i in range(0, len(pop)):
-                 for j in range(0, self.N_ + 1):
-                     self.best_individual_[i,j] = pop[i,j]
+            for i in range(0, len(pop)):
+                for j in range(0, self.N_ + 1):
+                    self.best_individual_[i,j] = pop[i,j]
                          
-                 self.initialize = 1
-                 return
+            self.initialize = 1
+            return
              
          for i in range(0, len(pop)):
              candidate_a = pop[i, self.N_]
@@ -275,41 +298,42 @@ class PSOSelector(object):
                      self.best_individual_[i, :])
              
              if particle_count > 0:
-                 if (pop[i,self.N_] == self.best_individual_[i, self.N_]
+                 if (candidate_a == candidate_b
                         and particle_count < count_best_individual):
                      
                      for j in range(0, self.N_ + 1):
                          self.best_individual_[i,j] = pop[i,j]
                          
                          
-       def calculate_best_global(self):
-
+       def calculate_best_global_type_2(self):
+         
          if self.initialize_1 == 0:
-             
              for i in range(0, self.N_ + 1):
                  self.best_global_[0,i] = self.best_individual_[0, i]
                  
              self.initialize_1 = 1
-             
              self.count_global = self.count_features(self.best_global_[0, :])
-                         
-         for i in range(0, self.num_particles):   
-             if self.is_solution_better(self.best_individual_[i, self.N_],
-                                        self.best_global_[0, self.N_]):
+
+                        
+         for i in range(0, self.num_particles): 
+             best_ind = self.best_individual_[i, self.N_]
+             best_global = self.best_global_[0, self.N_]
+
+             if self.is_solution_better(best_ind,
+                                        best_global):
                  
-                 self.local_improvement = 1
-                 for j in range(0, self.N + 1):
-                     self.best_global_[0,j] = self.best_individual_[i,j]
+                self.local_improvement = 1
+                for j in range(0, self.N_ + 1):
+                    
+                    self.best_global_[0,j] = self.best_individual_[i,j]
                  
-                 self.count_global = self.count_features(
+
+                self.count_global = self.count_features(
                          self.best_global_[0, :])
                  
-                 continue
+                continue
              
              count_best_individual = self.count_features(self.best_individual_[i, :])
-             
-             best_global = self.best_global_[0, self.N_]
-             best_ind = self.best_individual_[i, self.N_]
              
              if (best_global == best_ind
                        and count_best_individual < self.count_global):
@@ -323,7 +347,7 @@ class PSOSelector(object):
                          self.best_global_[0, :])
                  
                            
-       def calculate_best_individual_pso_1_1(self,pop):
+       def calculate_best_individual_type_1(self,pop):
 
          if self.initialize == 0:
              for i in range(0, len(pop)):
@@ -339,10 +363,10 @@ class PSOSelector(object):
                      self.best_individual_[i, j] = pop[i,j]
                     
                  
-       def calculate_best_global_pso_1_1(self):
+       def calculate_best_global_type_1(self):
           if self.initialize_1 == 0:
               for i in range(0, self.N_ + 1):
-                  self.best_global[0,i] = self.best_individual_[0,i]
+                  self.best_global_[0,i] = self.best_individual_[0,i]
               self.initialize_1 = 1    
 
           for i in range(0, len(self.pop_)):
@@ -355,7 +379,156 @@ class PSOSelector(object):
                   
           self.local_improvement += 1
           
-          
+
+       def calculate_best_individual_type_3(self, pop):
+         
+         if self.initialize == 0:
+            for i in range(0, len(pop)):
+                for j in range(0, self.N_ + 1):
+                    self.best_individual_[i,j] = pop[i,j]
+                         
+            self.initialize = 1
+            return
+             
+         for i in range(0, len(pop)):
+             candidate_a = pop[i, self.N_]
+             candidate_b = self.best_individual_[i, self.N_]
+
+             particle_count = self.count_features(self.pop_[i, :])
+             count_best_individual = self.count_features(
+                     self.best_individual_[i, :])
+             
+             if particle_count > 0:
+                 if (self.is_solution_better(candidate_a,candidate_b)
+                        and particle_count <= count_best_individual):
+                     
+                     for j in range(0, self.N_ + 1):
+                         self.best_individual_[i,j] = pop[i,j]
+
+                 elif (candidate_a == candidate_b 
+                      and particle_count < count_best_individual):   
+
+                     for j in range(0, self.N_ + 1):
+                         self.best_individual_[i,j] = pop[i,j]    
+                 else:
+                     continue        
+                         
+       def calculate_best_global_type_3(self):
+         
+         if self.initialize_1 == 0:
+             for i in range(0, self.N_ + 1):
+                 self.best_global_[0,i] = self.best_individual_[0, i]
+                 
+             self.initialize_1 = 1
+             self.count_global = self.count_features(self.best_global_[0, :])
+
+                        
+         for i in range(0, self.num_particles): 
+             best_ind = self.best_individual_[i, self.N_]
+             best_global = self.best_global_[0, self.N_]
+             count_best_individual = self.count_features(self.best_individual_[i, :])
+             
+             if (self.is_solution_better(best_ind,best_global)
+                 and count_best_individual <= self.count_global):
+                 
+                self.local_improvement = 1
+                for j in range(0, self.N_ + 1):
+                    self.best_global_[0,j] = self.best_individual_[i,j]
+                 
+
+                self.count_global = self.count_features(
+                         self.best_global_[0, :])
+                 
+             elif (best_ind == best_global
+                  and count_best_individual < self.count_global):
+
+                 self.local_improvement = 1
+                 self.count_global = 0
+                 for j in range(0, self.N_ + 1):
+                     self.best_global_[0, j] = self.best_individual_[i,j]
+                     
+                 self.count_global = self.count_features(
+                         self.best_global_[0, :])
+
+             else:
+                 continue            
+
+
+
+       def calculate_best_individual_type_4(self, pop):
+         
+         if self.initialize == 0:
+            for i in range(0, len(pop)):
+                for j in range(0, self.N_ + 1):
+                    self.best_individual_[i,j] = pop[i,j]
+                         
+            self.initialize = 1
+            return
+             
+         for i in range(0, len(pop)):
+             candidate_a = pop[i, self.N_]
+             candidate_b = self.best_individual_[i, self.N_]
+
+             particle_count = self.count_features(self.pop_[i, :])
+             count_best_individual = self.count_features(
+                     self.best_individual_[i, :])
+             
+             if particle_count > 0:
+                 if (self.is_solution_better(candidate_a,candidate_b)
+                        and particle_count <= count_best_individual):
+                     
+                     for j in range(0, self.N_ + 1):
+                         self.best_individual_[i,j] = pop[i,j]
+
+                 elif (self.is_solution_better(candidate_a, 0.95 * candidate_b) 
+                      and particle_count < count_best_individual):   
+
+                     for j in range(0, self.N_ + 1):
+                         self.best_individual_[i,j] = pop[i,j]    
+                 else:
+                     continue        
+                         
+       def calculate_best_global_type_4(self):
+         
+         if self.initialize_1 == 0:
+             for i in range(0, self.N_ + 1):
+                 self.best_global_[0,i] = self.best_individual_[0, i]
+                 
+             self.initialize_1 = 1
+             self.count_global = self.count_features(self.best_global_[0, :])
+
+                        
+         for i in range(0, self.num_particles): 
+             best_ind = self.best_individual_[i, self.N_]
+             best_global = self.best_global_[0, self.N_]
+             count_best_individual = self.count_features(self.best_individual_[i, :])
+             
+             if (self.is_solution_better(best_ind,best_global)
+                 and count_best_individual <= self.count_global):
+                 
+                self.local_improvement = 1
+                for j in range(0, self.N_ + 1):
+                    self.best_global_[0,j] = self.best_individual_[i,j]
+                 
+
+                self.count_global = self.count_features(
+                         self.best_global_[0, :])
+                 
+             elif (self.is_solution_better(best_ind, 0.95 * best_global)
+                  and count_best_individual < self.count_global):
+
+                 self.local_improvement = 1
+                 self.count_global = 0
+                 for j in range(0, self.N_ + 1):
+                     self.best_global_[0, j] = self.best_individual_[i,j]
+                     
+                 self.count_global = self.count_features(
+                         self.best_global_[0, :])
+
+             else:
+                 continue   
+
+
        def count_features(self, particle_proportions, threshold=0.6):
          
          count = 0
@@ -364,9 +537,13 @@ class PSOSelector(object):
                  count = count + 1
          return count        
          
-          
-                  
-              
+       @property   
+       def final_cols(self):           
+           return self._final_cols 
+
+       @property
+       def final_index(self):
+           return self._final_index      
               
               
 

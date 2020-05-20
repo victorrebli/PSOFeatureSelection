@@ -17,7 +17,6 @@ warnings.filterwarnings("ignore")
 
 class SolutionEvaluator(object):
     
-    
     def __init__(self, p, size_pop):
         
         self.p = p
@@ -40,8 +39,7 @@ class SolutionEvaluator(object):
         tam = pop.shape[1] - 1
         x_train = self.data
         y_train = self.label
-        
-        
+         
         self.cvs = self._get_cv(y_train)
         for i in range(0, self.size_pop):
             
@@ -50,19 +48,15 @@ class SolutionEvaluator(object):
                 
                 if isinstance(x_train, pd.DataFrame):
                     dados_train = x_train.drop(x_train.columns[[lista]], 1)
-                    
-                    
+                        
                 if sparse.issparse(x_train):
                     dados_train = x_train[:, lista]
-                    
-                    
+                       
                 pred = self.model(dados_train, y_train)    
-                
-                pop[i ,tam] = pred
+                pop[i ,tam] = np.round(pred, 3)
                 self.totaliter.append(pop[i, :])
                 
         return pop
-
 
     def drop_features(self, s, threshold=0.6):
         
@@ -72,24 +66,17 @@ class SolutionEvaluator(object):
                 listt.append(i)
 
         return listt
-    
-    
-    
+
     def model(self, data, y_train):
-        
-        
         
         module_name = self.estimator.__module__
         if 'xgboost' in module_name:
             result = self._tune_xgb(data, y_train)
         elif 'lightgbm' in module_name:
-            result = self._tune_lgb(data, y_train)
-            
+            result = self._tune_lgb(data, y_train)    
         else:
-            result = self._tune_generic(data, y_train)
-            
+            result = self._tune_generic(data, y_train)     
         return result
-
 
     def _tune_xgb(self, x_tr, y_tr):
         
@@ -98,10 +85,8 @@ class SolutionEvaluator(object):
         x_tr = np.array(x_tr)
         y_tr = np.array(y_tr)
 
-
         for train_index, test_index in self.cvs.split(x_tr, y_tr):
-            
-            
+              
             train_x, valid_x = x_tr[train_index], x_tr[test_index]
             train_y, valid_y = y_tr[train_index], y_tr[test_index]
             
@@ -134,13 +119,9 @@ class SolutionEvaluator(object):
                     early_stopping_rounds=self.extra['early_stopping_rounds'],
                     verbose=self.extra['verbose'])
             lista_models.append(self.estimator.best_score_['valid_0'][self.extra['eval_metric']])
-            
-            
-            
+                
         return np.mean(lista_models)                    
-                    
-            
-            
+                            
     def _tune_generic(self, x_tr, y_tr):
         
         lista_models = []
@@ -149,7 +130,6 @@ class SolutionEvaluator(object):
         y_tr = np.array(y_tr)
         
         for train_index, test_index in self.cvs.split(x_tr, y_tr):
-            
             
             train_x, valid_x = x_tr[train_index], x_tr[test_index]
             train_y, valid_y = y_tr[train_index], y_tr[test_index]
