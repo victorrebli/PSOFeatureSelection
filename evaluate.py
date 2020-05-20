@@ -96,7 +96,9 @@ class SolutionEvaluator(object):
         lista_models = []
         
         x_tr = np.array(x_tr)
-        
+        y_tr = np.array(y_tr)
+
+
         for train_index, test_index in self.cvs.split(x_tr, y_tr):
             
             
@@ -110,22 +112,17 @@ class SolutionEvaluator(object):
                     early_stopping_rounds=self.extra['early_stopping_rounds'],
                     verbose=self.extra['verbose'])
             lista_models.append(self.estimator.best_score)
-            
-            
-            
+                  
         return np.mean(lista_models)    
-            
-                    
-                    
-                    
+                         
     def _tune_lgb(self, x_tr, y_tr):
         
         lista_models = []
         
         x_tr = np.array(x_tr)
-        
+        y_tr = np.array(y_tr)
+
         for train_index, test_index in self.cvs.split(x_tr, y_tr):
-            
             
             train_x, valid_x = x_tr[train_index], x_tr[test_index]
             train_y, valid_y = y_tr[train_index], y_tr[test_index]
@@ -149,6 +146,7 @@ class SolutionEvaluator(object):
         lista_models = []
         
         x_tr = np.array(x_tr)
+        y_tr = np.array(y_tr)
         
         for train_index, test_index in self.cvs.split(x_tr, y_tr):
             
@@ -163,16 +161,9 @@ class SolutionEvaluator(object):
                 
                 pred = self.estimator.predict_proba(valid_x)[:, 1]
                 lista_models.append(roc_auc_score(valid_y, pred))
-                
-            
-            
-            
-            
+                      
         return np.mean(lista_models)                 
-            
-            
-        
-        
+                 
     def _get_cv(self, y_tr):
         
         cv = check_cv(self.cv, y_tr, classifier=is_classifier(self.estimator))

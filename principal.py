@@ -6,28 +6,30 @@ import numpy as np
 import pandas as pd
 import logging
 import problem
-reload(problem)
+#reload(problem)
 import evaluate
-reload(evaluate)
+#reload(evaluate)
 from problem import Problem
 from evaluate import SolutionEvaluator
 
 
-logFormatter = logging.Formatter("[%(asctime)s] %(message)s", datefmt='%m/%d %I:%M:%S')
-
-rootLogger = logging.getLogger()
-rootLogger.setLevel(logging.DEBUG)
-
-if not rootLogger.handlers:
-    fileHandler = logging.FileHandler(datetime.now().strftime('PSO_%d-%m_%H:%M.log'))
-    fileHandler.setFormatter(logFormatter)
-    rootLogger.addHandler(fileHandler)
-
-    consoleHandler = logging.StreamHandler()
-    consoleHandler.setFormatter(logFormatter)
-    rootLogger.addHandler(consoleHandler)
-
+def log():
+    logFormatter = logging.Formatter("[%(asctime)s] %(message)s", datefmt='%m/%d %I:%M:%S')
+    rootLogger = logging.getLogger()
+    rootLogger.setLevel(logging.DEBUG)
     
+    if not rootLogger.handlers:
+        fileHandler = logging.FileHandler(datetime.now().strftime('PSO_%d-%m_%H:%M.log'))
+        fileHandler.setFormatter(logFormatter)
+        rootLogger.addHandler(fileHandler)
+
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(logFormatter)
+        rootLogger.addHandler(consoleHandler)
+    return rootLogger
+
+rootLogger  = log()    
+
 def minimize_comparator(individual_solution, global_solution) -> bool:
     return individual_solution < global_solution
 
@@ -76,7 +78,7 @@ def create_population_20_50_strategy(X, num_particles):
 class PSOException(Exception):
                                                  
       def __init__(self,message):
-         super(PSOEception, self).__init__()
+         super(PSOException, self).__init__()
          self.message = message
                                                  
       def __str__(self):
@@ -99,8 +101,6 @@ class PSOSelector(object):
            self.evaluator_ = None
            self.estimator = estimator
            self.velocity_ = None
-           #self.best_individual_ = None
-           #self.best_global_ = None
            self.solution_ = None
            self.initialize = 0
            self.initialize_1 = 0
@@ -143,8 +143,16 @@ class PSOSelector(object):
            else:
                self.is_solution_better = minimize_comparator
                
-               
-               
+       def model_baseline(self, prob):
+
+           n_cols = prob.data.shape[1]
+           particle = np.zeros(shape=(1, n_cols + 1))
+           particle[:] = 1
+           evaluator_ = SolutionEvaluator(prob, 1)
+           score = evaluator_.evaluate(particle)
+           return score[0]
+
+
        def fit(self, X, unused_y, **kargs):
            
            if not isinstance(X, pd.DataFrame):
@@ -154,9 +162,14 @@ class PSOSelector(object):
            prob = Problem(X, unused_y, self.estimator,
                           self.cv, **kargs)
            
+
            self.N_ = prob.n_cols
            self.evaluator_ = SolutionEvaluator(prob, self.num_particles)
-           
+
+           score_all = self.model_baseline(prob)
+           rootLogger.info((
+                       f'Score with all features - {score_all[-1]}'))
+
            self.velocity_ = np.zeros(shape=(self.num_particles, self.N_))
            self.best_global_, self.best_global_[:] = \
              np.zeros(shape=(1, self.N_ + 1)), 'nan'
@@ -191,15 +204,12 @@ class PSOSelector(object):
                self.selected_features_, = np.where(self.selected_features_.mask == True)
                rootLogger.info((f'Index features selected: {self.selected_features_} /n, '
                                 f'Columns selected: {colunas} \n'))
-               
-               
+                        
        def _initialize(self, X):
            
           self.iteration_ = 0
           self.pop_ = self.init_method_(X, self.num_particles)
-          
-          
-          
+              
        def _is_stop_criteria_accepted(self):
           
           no_global_improv = self.local_improvement >= self.max_local_improvement
@@ -207,8 +217,7 @@ class PSOSelector(object):
           return max_iter_reached or no_global_improv
       
        def search_type_1(self):
-          
-          
+           
           self.pop_ = self.evaluator_.evaluate(self.pop_)
           self.calculate_best_individual_pso_1_1(self.pop_)
           self.calculate_best_global_pso_1_1()
@@ -220,7 +229,6 @@ class PSOSelector(object):
        def search_type_2(self):
          
           self.pop_ = self.evaluator_.evaluate(self.pop_)
-          #breakpoint()
           self.calculate_best_individual(self.pop_)
           self.calculate_best_global()
           self.solution_[self.iteration_, :] = self.best_global_
@@ -228,7 +236,6 @@ class PSOSelector(object):
           self.iteration_ += 1
          
        def update_velocity(self):
-         
          
          w = self.w
          c1, c2 = self.c1, self.c2
@@ -246,13 +253,12 @@ class PSOSelector(object):
                  self.pop_[i,j] += velocity
                  
        def calculate_best_individual(self, pop):
-         #breakpoint()
+         
          if self.initialize == 0:
              for i in range(0, len(pop)):
                  for j in range(0, self.N_ + 1):
                      self.best_individual_[i,j] = pop[i,j]
-                     
-                     
+                         
                  self.initialize = 1
                  return
              
@@ -316,9 +322,7 @@ class PSOSelector(object):
                  self.count_global = self.count_features(
                          self.best_global_[0, :])
                  
-                 
-                 
-                 
+                           
        def calculate_best_individual_pso_1_1(self,pop):
 
          if self.initialize == 0:
@@ -330,8 +334,7 @@ class PSOSelector(object):
          
          for i in range(0, len(pop)):
              if self.is_solution_better(pop[i,self.N_],
-                                        self.best_individual_[i, self.N_]):
-                 
+                                        self.best_individual_[i, self.N_]): 
                  for j in range(0, self.N_ + 1):
                      self.best_individual_[i, j] = pop[i,j]
                     
