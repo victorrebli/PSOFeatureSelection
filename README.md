@@ -5,6 +5,7 @@ Particle swarm Optmization(PSO) simulates the social behaviour such as birds flo
 This is the implementation of the paper:
 
 **Particle swarm optimisation for feature selection in classification:Novel initialisation and updating mechanisms**
+
 Bing Xue∗, Mengjie Zhang, Will N. Browne
 
 Follogin the notebook **examples.ipynb** to see how use the algorithm.
